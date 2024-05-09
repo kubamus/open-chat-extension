@@ -22,7 +22,11 @@ body {
   display: flex;
   justify-content: space-between;
 }
-.settingsButton {
+.popup-header-right {
+  display: flex;
+  align-items: center;
+}
+.headerButton {
   background-color: transparent;
   text-decoration: underline;
   border: none;
@@ -38,7 +42,8 @@ body {
 .messages-container {
   padding: 10px;
   border-bottom: 1px solid #ddd;
-  max-height: 300px;
+  min-height: 150px;
+  max-height: 250px;
   overflow-y: auto;
 }
 
@@ -62,6 +67,9 @@ body {
   border: 1px solid #ccc;
   border-radius: 10px;
   margin-right: 10px;
+  &:disabled {
+    cursor: not-allowed;
+  }
 }
 
 .send-button {
@@ -71,7 +79,11 @@ body {
   border: none;
   border-radius: 10px;
   cursor: pointer;
-  &:hover {
+  &:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+  }
+  &:not(:disabled):hover {
     background-color: #3e8e41;
   }
 }

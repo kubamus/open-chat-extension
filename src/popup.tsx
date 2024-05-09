@@ -27,9 +27,11 @@ interface IOptions {
   isUsingWholePageHTML: boolean;
   theme: "light" | "dark";
   systemPrompt: string;
+  model: string;
 }
 
 const Popup = () => {
+  const [isAiResponding, setIsAiResponding] = useState(false);
   const [options, setOptions] = useState<IOptions>();
   const [messages, setMessages] = useState<IMessage[]>([]);
   const userInputRef = useRef<HTMLInputElement>(null);
@@ -83,6 +85,15 @@ const Popup = () => {
     chrome.storage.sync.get("options", (data) => {
       setOptionsFunction(data as { options: IOptions });
     });
+
+    const getMessagesBackup = () => {
+      chrome.storage.local.get("messagesBackup", (data) => {
+        if (data.messagesBackup) {
+          setMessages(data.messagesBackup);
+        }
+      });
+    };
+    getMessagesBackup();
   }, []);
 
   async function getCurrentContext() {
@@ -108,9 +119,9 @@ const Popup = () => {
     });
   }
 
-  const chatModel = new ChatOllama({
-    model: "llama3:latest",
-  });
+  const createMessagesBackup = (messages: IMessage[]) => {
+    chrome.storage.local.set({ messagesBackup: messages });
+  };
 
   const processMessage = (
     message: string,
@@ -124,6 +135,7 @@ const Popup = () => {
         { id: newMessageId, content: message, role: "assistant" },
       ];
       setMessages(updatedMessages);
+      createMessagesBackup(updatedMessages);
       return { id: newMessageId, updatedMessages };
     } else {
       const currentMessagesCopy = [...currentMessages];
@@ -134,14 +146,31 @@ const Popup = () => {
         return { id: -1, updatedMessages: currentMessagesCopy };
       currentMessagesCopy[messageIndex].content += message;
       setMessages(currentMessagesCopy);
+      createMessagesBackup(currentMessagesCopy);
       return { id: messageId, updatedMessages: currentMessagesCopy };
     }
+  };
+
+  const clearChat = () => {
+    setMessages([]);
+    createMessagesBackup([]);
   };
 
   const handleGenerate = async () => {
     const userInput = userInputRef.current?.value;
     if (!userInput) return;
 
+    if (userInput.startsWith("/")) {
+      const command = userInput.split(" ")[0];
+      if (command === "/clear") {
+        clearChat();
+      } else if (command === "/help" || command === "/commands") {
+        alert("Available commands: /clear, /help, /commands");
+      }
+      userInputRef.current!.value = "";
+      return;
+    }
+    setIsAiResponding(true);
     let context;
     try {
       context = await getCurrentContext();
@@ -186,7 +215,14 @@ const Popup = () => {
       const systemMessage = options?.systemPrompt
         ? new AIMessage(options.systemPrompt)
         : null;
-      console.log(systemMessage);
+
+      if (!options?.model) {
+        return alert("Please select a model from the settings page.");
+      }
+      const chatModel = new ChatOllama({
+        model: options.model,
+      });
+      console.log(chatModel.model);
       const stream = await chatModel.stream(
         systemMessage ? [systemMessage, ...fixedMessages] : fixedMessages
       );
@@ -204,18 +240,25 @@ const Popup = () => {
       if (error instanceof Error)
         alert("Error generating response: " + error.message);
       else alert("Error generating response: " + error);
+    } finally {
+      setIsAiResponding(false);
     }
   };
   return (
     <div id="wrapper" className="popup-wrapper">
       <div className="popup-header">
         <h1 className="popup-title">Popup</h1>
-        <button
-          className="settingsButton"
-          onClick={() => chrome.tabs.create({ url: "options.html" })}
-        >
-          Settings
-        </button>
+        <div className="popup-header-right">
+          <button className="headerButton" onClick={() => clearChat()}>
+            Clear Chat
+          </button>
+          <button
+            className="headerButton"
+            onClick={() => chrome.tabs.create({ url: "options.html" })}
+          >
+            Settings
+          </button>
+        </div>
       </div>
       <div
         id="messages"
@@ -238,11 +281,13 @@ const Popup = () => {
           type="text"
           id="userMessage"
           className="user-input"
+          disabled={isAiResponding}
         />
         <button
           id="userSendButton"
           onClick={handleGenerate}
           className="send-button"
+          disabled={isAiResponding}
         >
           Send
         </button>

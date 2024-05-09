@@ -6,10 +6,12 @@ interface IOptions {
   isUsingWholePageHTML: boolean;
   theme: "light" | "dark";
   systemPrompt: string;
+  model: string;
 }
 
 const Options = () => {
   const [options, setOptions] = useState<IOptions>();
+  const [availableModels, setAvailableModels] = useState<string[]>([]);
   const restoreOptions = () => {
     chrome.storage.sync.get("options", (data) => {
       if (data.options) setOptions(data.options);
@@ -24,6 +26,12 @@ const Options = () => {
   };
   useEffect(() => {
     restoreOptions();
+    fetch("http://localhost:11434/api/tags", { cache: "no-store" })
+      .then((resp) => resp.json())
+      .then((data) => {
+        const names = data.models.map((model: any) => model.name);
+        setAvailableModels(names);
+      });
   }, []);
 
   const handleOptionChange = (option: keyof IOptions, value: any) => {
@@ -33,7 +41,7 @@ const Options = () => {
         ({
           ...prevOptions,
           [option]: value,
-        } as IOptions)
+        }) as IOptions
     );
   };
 
@@ -85,6 +93,22 @@ const Options = () => {
           className="textarea"
         ></textarea>
       </label>
+      {availableModels.length > 0 ? (
+        <label className="optionLabel">
+          Model
+          <select
+            onChange={(e) => handleOptionChange("model", e.target.value)}
+            value={options.model}
+            className="select"
+          >
+            {availableModels.map((model, i) => (
+              <option key={i} value={model}>
+                {model}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
       <div className="buttons">
         <button className="button" onClick={() => saveOptions()}>
           save
