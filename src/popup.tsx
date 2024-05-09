@@ -175,8 +175,6 @@ const Popup = () => {
     try {
       context = await getCurrentContext();
     } catch (error) {
-      console.error("Context has not been set.");
-      console.error(error);
       context = null;
     }
     const newMessage: IMessage = {
